@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Main - Video Game Sales Visualization Project</title>
+
+<script src="https://d3js.org/d3.v6.min.js"></script>
+
+<h1>Video Game Sales Visualization Project</h1>
+
+<button onclick="update('top_games')">Top 10 Games</button>
+<button onclick="update('sales_platform')">Sales by Platform</button>
+<button onclick="update('top_publishers')">Top 10 Publishers</button>
+<button onclick="update('regional_sales')">Regional Sales</button>
+<button onclick="update('sales_genre')">Sales by Genre</button>
+
+<br><br>
+<a href="index.html">Home</a>&emsp;
+<a href="documentation.html">Documentation</a>
+
+<div id="my_dataviz"></div>
+
+<script>
+  const margin = { top: 80, right: 60, bottom: 140, left: 120 },
+    width = 800 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+
+  const svg = d3.select("#my_dataviz")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  svg.append("text")
+    .attr("class", "chart-title")
+    .attr("text-anchor", "middle")
+    .attr("x", width / 2)
+    .attr("y", -40)
+    .style("font-size", "22px")
+    .style("font-weight", "bold")
+    .text("");
+
+  svg.append("text")
+    .attr("class", "x label")
+    .attr("text-anchor", "middle")
+    .attr("x", width / 2)
+    .attr("y", height + 120)
+    .text("X Axis Label");
+
+  svg.append("text")
+    .attr("class", "y label")
+    .attr("text-anchor", "middle")
+    .attr("transform", "rotate(-90)")
+    .attr("x", -height / 2)
+    .attr("y", -50)
+    .text("Y Axis Label");
+
+  const x = d3.scaleBand()
+    .range([0, width])
+    .padding(0.2);
+
+  const xAxis = svg.append("g")
+    .attr("transform", `translate(0,${height})`);
+
+  const y = d3.scaleLinear()
+    .range([height, 0]);
+
+  const yAxis = svg.append("g")
+    .attr("class", "myYaxis");
+
+  let rawData;
+
+  d3.csv("video_games_sales.csv").then(function (data) {
+    rawData = data;
+    update('top_games');
+  });
+
+  function update(view) {
+
+    let data = [];
+    let chartTitle = "";
+
+    if (view === 'top_games') {
+      chartTitle = "Top 10 Best-Selling Games";
+      data = rawData
+        .sort((a, b) => d3.descending(+a.Global_Sales, +b.Global_Sales))
+        .slice(0, 10);
+      x.domain(data.map(d => d.Name));
+      y.domain([0, d3.max(data, d => +d.Global_Sales)]);
+      svg.select(".x.label").text("Game Name");
+      svg.select(".y.label").text("Global Sales (millions)");
+
+    } else if (view === 'sales_platform') {
+      chartTitle = "Top Platforms by Global Sales";
+      let platformSales = d3.rollups(
+        rawData,
+        v => d3.sum(v, d => +d.Global_Sales),
+        d => d.Platform
+      );
+      data = platformSales.map(([Platform, Global_Sales]) => ({ Platform, Global_Sales }))
+        .sort((a, b) => d3.descending(a.Global_Sales, b.Global_Sales))
+        .slice(0, 10);
+      x.domain(data.map(d => d.Platform));
+      y.domain([0, d3.max(data, d => +d.Global_Sales)]);
+      svg.select(".x.label").text("Platform");
+      svg.select(".y.label").text("Global Sales (millions)");
+
+    } else if (view === 'top_publishers') {
+      chartTitle = "Top 10 Publishers by Global Sales";
+      let publisherSales = d3.rollups(
+        rawData,
+        v => d3.sum(v, d => +d.Global_Sales),
+        d => d.Publisher
+      );
+      data = publisherSales.map(([Publisher, Global_Sales]) => ({ Publisher, Global_Sales }))
+        .sort((a, b) => d3.descending(a.Global_Sales, b.Global_Sales))
+        .slice(0, 10);
+      x.domain(data.map(d => d.Publisher));
+      y.domain([0, d3.max(data, d => +d.Global_Sales)]);
+      svg.select(".x.label").text("Publisher");
+      svg.select(".y.label").text("Global Sales (millions)");
+
+    } else if (view === 'regional_sales') {
+      chartTitle = "Regional Sales Breakdown";
+      data = [
+        { region: 'NA_Sales', value: d3.sum(rawData, d => +d.NA_Sales) },
+        { region: 'EU_Sales', value: d3.sum(rawData, d => +d.EU_Sales) },
+        { region: 'JP_Sales', value: d3.sum(rawData, d => +d.JP_Sales) },
+        { region: 'Other_Sales', value: d3.sum(rawData, d => +d.Other_Sales) }
+      ];
+      x.domain(data.map(d => d.region));
+      y.domain([0, d3.max(data, d => +d.value)]);
+      svg.select(".x.label").text("Region");
+      svg.select(".y.label").text("Total Sales (millions)");
+
+    } else if (view === 'sales_genre') {
+      chartTitle = "Sales by Genre";
+      let genreSales = d3.rollups(
+        rawData,
+        v => d3.sum(v, d => +d.Global_Sales),
+        d => d.Genre
+      );
+      data = genreSales.map(([Genre, Global_Sales]) => ({ Genre, Global_Sales }))
+        .sort((a, b) => d3.descending(a.Global_Sales, b.Global_Sales));
+      x.domain(data.map(d => d.Genre));
+      y.domain([0, d3.max(data, d => +d.Global_Sales)]);
+      svg.select(".x.label").text("Genre");
+      svg.select(".y.label").text("Global Sales (millions)");
+    }
+
+    svg.select(".chart-title")
+      .text(chartTitle);
+
+    xAxis.transition().duration(1000).call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform", "rotate(-45)")
+      .style("text-anchor", "end");
+
+    yAxis.transition().duration(1000).call(
+      d3.axisLeft(y)
+        .tickFormat(d3.format(".2s"))
+    );
+
+    let bars = svg.selectAll("rect")
+      .data(data);
+
+    bars.join("rect")
+      .transition()
+      .duration(1000)
+      .attr("x", d => x(
+        d.Name ||
+        d.Platform ||
+        d.Publisher ||
+        d.region ||
+        d.Genre
+      ))
+      .attr("y", d => y(d.Global_Sales || d.value))
+      .attr("width", x.bandwidth())
+      .attr("height", d => height - y(d.Global_Sales || d.value))
+      .attr("fill", "#69b3a2");
+
+    svg.selectAll(".bar-label").remove();
+
+    svg.selectAll(".bar-label")
+      .data(data)
+      .join("text")
+      .attr("class", "bar-label")
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "#000")
+      .style("font-weight", "bold")
+      .attr("x", d => x(
+        d.Name ||
+        d.Platform ||
+        d.Publisher ||
+        d.region ||
+        d.Genre
+      ) + x.bandwidth() / 2)
+      .attr("y", height)
+      .text(d => {
+        let value = d.Global_Sales || d.value;
+        return d3.format(".2s")(value);
+      })
+      .transition()
+      .duration(1000)
+      .attr("y", d => y(d.Global_Sales || d.value) - 5);
+  }
+</script>
